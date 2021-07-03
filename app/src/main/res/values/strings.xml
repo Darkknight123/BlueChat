@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">BlueChat</string>
+    <string name="str_label_btn_send">Send</string>
+</resources>
