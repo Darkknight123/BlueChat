@@ -3,6 +3,7 @@ package com.example.bluechat;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.bluetooth.BluetoothAdapter;
 import android.content.Context;
 import android.os.Bundle;
 import android.view.Menu;
@@ -11,12 +12,20 @@ import android.widget.Toast;
 
 public class MainActivity extends AppCompatActivity {
     private Context context;
+    private BluetoothAdapter bluetoothAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         context =this;
+        initBluetooth();
+    }
+    private void initBluetooth(){
+        bluetoothAdapter =BluetoothAdapter.getDefaultAdapter();
+        if (bluetoothAdapter ==null){
+            Toast.makeText(context,"No Bluetooth found",Toast.LENGTH_SHORT).show();
+        }
     }
 
     @Override
@@ -36,6 +45,14 @@ public class MainActivity extends AppCompatActivity {
                 return true;
             default:
                 return super.onOptionsItemSelected(item);
+        }
+
+    }
+    private  void enableBluetooth(){
+        if (bluetoothAdapter.isEnabled()){Toast.makeText(context,"Bluetooth Already on",Toast.LENGTH_SHORT).show();
+
+        }else {
+            bluetoothAdapter.enable();
         }
 
     }
