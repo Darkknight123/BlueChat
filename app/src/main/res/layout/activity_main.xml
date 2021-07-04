@@ -9,7 +9,9 @@
     <ListView
         android:id="@+id/list_conv"
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="760dp"
+        android:layout_marginBottom="60dp"
+        android:background="#ffff" />
 
     <RelativeLayout
         android:layout_width="match_parent"
