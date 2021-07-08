@@ -60,6 +60,9 @@ public class MainActivity extends AppCompatActivity {
     private void checkPermission(){
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION)!= PackageManager.PERMISSION_GRANTED){
             ActivityCompat.requestPermissions(MainActivity.this,new String[]{Manifest.permission.ACCESS_FINE_LOCATION},LOCATION_PERMISSION_REQUEST);
+        }else {
+            Intent intent=new Intent(context,DeviceListActivity.class);
+            startActivity(intent);
         }
     }
 
