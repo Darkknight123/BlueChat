@@ -1,6 +1,7 @@
 package com.example.bluechat;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
@@ -13,6 +14,8 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Toast;
@@ -20,14 +23,68 @@ import android.widget.Toast;
 public class MainActivity extends AppCompatActivity {
     private Context context;
     private BluetoothAdapter bluetoothAdapter;
+    private chatUtility chatUtils;
 
     private final int LOCATION_PERMISSION_REQUEST=101;
+    private final int SELECT_DEVICE=102;
+
+    public static final int MESSAGE_STATE_CHANGED=0;
+    public static final int MESSAGE_READ=1;
+    public static final int MESSAGE_WRITE=2;
+    public static final int MESSAGE_DEVICE_NAME=3;
+    public static final int MESSAGE_TOAST=4;
+
+    public static final String DEVICE_NAME="deviceName";
+    private String connectedDevice;
+    public static final String TOAST="toast";
+
+
+    private Handler handler =new Handler(new Handler.Callback() {
+        @Override
+        public boolean handleMessage(@NonNull Message msg) {
+            switch (msg.what){
+                case MESSAGE_STATE_CHANGED:
+                    switch (msg.arg1){
+                        case chatUtility.STATE_NONE:
+                            setState("Not connected");
+                            break;
+                        case chatUtility.STATE_LISTEN:
+                            setState("Not Connected");
+                            break;
+                        case chatUtility.STATE_CONNECTION:
+                            setState("Connecting....");
+                            break;
+                        case chatUtility.STATE_CONNECTED:
+                            setState("Connected: " + connectedDevice);
+                            break;
+                    }
+                    break;
+                case MESSAGE_READ:
+                    break;
+                case MESSAGE_WRITE:
+                    break;
+                case MESSAGE_DEVICE_NAME:
+                    connectedDevice = (String) msg.getData().get(DEVICE_NAME);
+                    Toast.makeText(context, connectedDevice,Toast.LENGTH_SHORT).show();
+                    break;
+                case MESSAGE_TOAST:
+                    Toast.makeText(context,msg.getData().getString(TOAST),Toast.LENGTH_SHORT).show();
+                    break;
+            }
+            return false;
+        }
+    });
+    private void setState(CharSequence subTitle){
+        getSupportActionBar().setSubtitle(subTitle);
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         context =this;
+
+        chatUtils =new chatUtility(context,handler);
         initBluetooth();
     }
     private void initBluetooth(){
@@ -62,8 +119,18 @@ public class MainActivity extends AppCompatActivity {
             ActivityCompat.requestPermissions(MainActivity.this,new String[]{Manifest.permission.ACCESS_FINE_LOCATION},LOCATION_PERMISSION_REQUEST);
         }else {
             Intent intent=new Intent(context,DeviceListActivity.class);
-            startActivity(intent);
+            startActivityForResult(intent,SELECT_DEVICE);
+
         }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable  Intent data) {
+        if (requestCode==SELECT_DEVICE && resultCode==RESULT_OK){
+            String address =data.getStringExtra("deviceAddress");
+            chatUtils.connecting(bluetoothAdapter.getRemoteDevice(address));
+        }
+        super.onActivityResult(requestCode, resultCode, data);
     }
 
     @Override
@@ -73,7 +140,7 @@ public class MainActivity extends AppCompatActivity {
             if (grantResults.length>0 && grantResults[0]==PackageManager.PERMISSION_GRANTED){
 
                 Intent intent =new Intent(context,DeviceListActivity.class);
-                startActivity(intent);
+                startActivityForResult(intent,SELECT_DEVICE);
 
             }else {
                 new AlertDialog.Builder(context)
@@ -115,5 +182,11 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (chatUtils!=null){
+            chatUtils.stop();
+        }
+    }
 }
