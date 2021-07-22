@@ -18,12 +18,24 @@ import android.os.Handler;
 import android.os.Message;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
+import android.widget.ArrayAdapter;
+import android.widget.Button;
+import android.widget.EditText;
+import android.widget.ListView;
 import android.widget.Toast;
+
+import java.io.UnsupportedEncodingException;
 
 public class MainActivity extends AppCompatActivity {
     private Context context;
     private BluetoothAdapter bluetoothAdapter;
     private chatUtility chatUtils;
+
+    private ListView listMainChat;
+    private EditText editText;
+    private Button sendMsg;
+    private ArrayAdapter<String>adapterMainChat;
 
     private final int LOCATION_PERMISSION_REQUEST=101;
     private final int SELECT_DEVICE=102;
@@ -59,10 +71,17 @@ public class MainActivity extends AppCompatActivity {
                             break;
                     }
                     break;
-                case MESSAGE_READ:
-                    break;
                 case MESSAGE_WRITE:
+                    byte[] buffer1=(byte[]) msg.obj;
+                    String outputBuffer=new String(buffer1);
+                    adapterMainChat.add("Me: " + outputBuffer);
                     break;
+                case MESSAGE_READ:
+                    byte[] buffer = (byte[]) msg.obj;
+                    String inputBuffer =new String(buffer,0,msg.arg1);
+                    adapterMainChat.add(connectedDevice + ":" + inputBuffer);
+                    break;
+
                 case MESSAGE_DEVICE_NAME:
                     connectedDevice = (String) msg.getData().get(DEVICE_NAME);
                     Toast.makeText(context, connectedDevice,Toast.LENGTH_SHORT).show();
@@ -84,8 +103,33 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         context =this;
 
+        init();
         chatUtils =new chatUtility(context,handler);
         initBluetooth();
+    }
+    private void init(){
+        listMainChat =findViewById(R.id.list_conv);
+        editText=findViewById(R.id.ed_enter_message);
+        sendMsg =findViewById(R.id.send_btn);
+
+        adapterMainChat=new ArrayAdapter<String>(context,R.layout.message_layout);
+        listMainChat.setAdapter(adapterMainChat);
+
+        sendMsg.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                String message=editText.getText().toString();
+                if (!message.isEmpty()){
+                    editText.setText("");
+                    try {
+                        chatUtils.write(String.valueOf(message.getBytes()).getBytes(message));
+                    } catch (UnsupportedEncodingException e) {
+                        e.printStackTrace();
+                    }
+
+                }
+            }
+        });
     }
     private void initBluetooth(){
         bluetoothAdapter =BluetoothAdapter.getDefaultAdapter();

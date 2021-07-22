@@ -11,6 +11,8 @@ import android.os.Message;
 import android.util.Log;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.UUID;
 
 
@@ -20,6 +22,7 @@ public class chatUtility {
     private ConnectThread connectThread;
     private BluetoothAdapter bluetoothAdapter;
     private AcceptThread acceptThread;
+    private ConnectedThread connectedThread;
 
     private final UUID APP_UUID = UUID.fromString("fa87cOdO-afac-11de8a39-0800200c9a66");
     private final String APP_NAME="BlueChat";
@@ -56,6 +59,10 @@ public class chatUtility {
             acceptThread=new AcceptThread();
             acceptThread.start();
         }
+        if (connectedThread!=null){
+            connectedThread.cancel();
+            connectedThread=null;
+        }
 
         setState(STATE_LISTEN);
 
@@ -70,6 +77,11 @@ public class chatUtility {
          acceptThread=null;
 
         }
+        if (acceptThread!=null){
+            acceptThread.cancel();
+            acceptThread=null;
+
+        }
         setState(STATE_NONE);
     }
     public void connecting(BluetoothDevice device){
@@ -80,8 +92,25 @@ public class chatUtility {
         connectThread =new ConnectThread(device);
         connectThread.start();
 
+        if (acceptThread!=null){
+            acceptThread.cancel();
+            acceptThread=null;
+
+        }
+
         setState(STATE_CONNECTION);
 
+    }
+    public void write(byte[] buffer){
+        ConnectedThread connThread;
+        synchronized (this){
+            if (state != STATE_CONNECTED){
+                return;
+            }
+
+            connThread=connectedThread;
+        }
+        connThread.write(buffer);
     }
     private class AcceptThread extends Thread{
         private BluetoothServerSocket serverSocket;
@@ -111,7 +140,7 @@ public class chatUtility {
                 switch (state){
                     case STATE_LISTEN:
                     case STATE_CONNECTION:
-                        connect(socket.getRemoteDevice());
+                        connected(socket.getRemoteDevice());
                         break;
                     case STATE_NONE:
                     case STATE_CONNECTED:
@@ -167,7 +196,7 @@ public class chatUtility {
 
             }
 
-            connect(device);
+            connected(device);
         }
         public void cancel(){
             try {
@@ -176,6 +205,71 @@ public class chatUtility {
                 Log.e("Connect->Cancel",e.toString());
             }
         }
+    }
+
+    private void connected(BluetoothDevice device) {
+        if (connectThread!=null){
+            connectThread.cancel();
+            connectThread=null;
+        }
+    }
+
+    private  class ConnectedThread extends Thread{
+        private final BluetoothSocket socket;
+        private final InputStream inputStream;
+        private final OutputStream outputStream;
+
+        public ConnectedThread(BluetoothSocket socket){
+            this.socket=socket;
+
+            InputStream tmpIn=null;
+            OutputStream tmpOut=null;
+            try {
+                tmpIn= socket.getInputStream();
+                tmpOut=socket.getOutputStream();
+            }catch (IOException e){
+            }
+            inputStream=tmpIn;
+            outputStream=tmpOut;
+        }
+
+        public void run(){
+            byte[]buffer=new byte[1024];
+            int bytes;
+
+            try{
+                bytes = inputStream.read(buffer);
+
+                handler.obtainMessage(MainActivity.MESSAGE_READ,bytes,-1,buffer).sendToTarget();
+            }catch (IOException e){
+                connectionLost();
+            }
+        }
+        public void write(byte[] buffer){
+            try {
+                outputStream.write(buffer);
+                handler.obtainMessage(MainActivity.MESSAGE_WRITE,-1,-1,buffer).sendToTarget();
+            }catch (IOException e){
+
+            }
+        }
+
+        public void cancel(){
+            try {
+                socket.close();
+            }catch (IOException e){
+
+            }
+        }
+    }
+    private void connectionLost(){
+        Message message=handler.obtainMessage(MainActivity.MESSAGE_TOAST);
+        Bundle bundle=new Bundle();
+        bundle.putString(MainActivity.TOAST,"Connection Lost");
+        message.setData(bundle);
+        handler.sendMessage(message);
+
+        chatUtility.this.start();
     }
     private synchronized void connectionFailed(){
         Message message = handler.obtainMessage(MainActivity.MESSAGE_TOAST);
@@ -188,11 +282,19 @@ public class chatUtility {
 
     }
 
-    private synchronized void connect(BluetoothDevice device){
+    private synchronized void connected(BluetoothSocket socket, BluetoothDevice device){
         if (connectThread!=null){
             connectThread.cancel();
             connectThread=null;
         }
+        if (acceptThread!=null){
+            acceptThread.cancel();
+            acceptThread=null;
+
+        }
+
+        connectedThread =new ConnectedThread(socket);
+        connectedThread.start();
 
         Message message = handler.obtainMessage(MainActivity.MESSAGE_DEVICE_NAME);
         Bundle bundle =new Bundle();
